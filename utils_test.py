@@ -55,7 +55,7 @@ class TestRowToCustomStr(unittest.TestCase):
         expected_output = "col1: a"
         self.assertEqual(utils.row_to_custom_str(row, True), expected_output)
 
-    def test_row_to_custom_str_removes_empty_values(self):
+    def test_row_to_custom_str_removes_na_values(self):
         row = pd.Series({"col1": "a", "col2": pd.NA})
         expected_output = "col1: a"
         self.assertEqual(utils.row_to_custom_str(row, True), expected_output)

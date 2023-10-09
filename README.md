@@ -1,10 +1,17 @@
 # Description Genius 🦉
-[Features](#features) • [Getting Started](#getting-started) • [Disclaimer](#disclaimer)
+[Requirements](#requirements) • [Features](#features) • [Getting Started](#getting-started) • [Advanced Features](#advanced-features) •  [Disclaimer](#disclaimer)
 
 Easily generate captivating product descriptions using product features and any additional sources of information that you may have e.g. product reviews, usage instructions etc.
 
+
+## Requirements
+Description Genius uses Google Cloud Platform's [Vertex AI language models](https://cloud.google.com/vertex-ai/docs/generative-ai/language-model-overview) to generate product descriptions. In order to use Description Genius, you need access to a Google Cloud Project with the [Vertex AI API](https://cloud.google.com/vertex-ai/docs/generative-ai/start/quickstarts/api-quickstart) enabled.
+
+
 ## Features
 Description Genius brings the latest advances in Generative AI in an easy to use package.
+
+<img src='./assets/ui.png' alt='Description Genius User Interface' />
 
 The interactive UI lets you upload a CSV file containing a list of your products alongside their features. An example CSV file could look like this:
 
@@ -12,6 +19,16 @@ The interactive UI lets you upload a CSV file containing a list of your products
 |---|---|---|---|---|---|---|
 | 1 | Black | Leather | Pants | s/m/l | $250 | Hand wash |
 | 2 | Purple | Cotton | Sweater | m | $99 | Machine washable at 45C |
+
+
+### Description Format
+Description Genius can generate product descriptions in the format of your choice. Be it a single paragraph, multiple paragraphs with headlines or even HTML tags.
+
+Simply provide a few examples of your input and output (in the format of your choice) under the Few-Shot examples section.
+
+<img src='./assets/few_shot_examples.png' alt='Output Formatting' />
+
+> Tip: For the best results, make sure you provide at least three examples for our model to learn from.
 
 
 ## Getting Started
@@ -26,6 +43,21 @@ To get started:
 This should open up a browser window with the Description Genius UI. Simply upload a CSV file containing your product features alongside a prompt for the language model. Also provide a few examples of how your output should look like. Optionally, you can include additional sources of information such as styling guidelines, material information etc.
 
 Once done, click on `Generate`. Description Genius will now generate your descriptions and output them in a table directly in the UI. You can now make any edits to the generated text and finally download it by clicking the `Download data as CSV` button.
+
+## Advanced Features
+Description Genius offers a number of advanced features to improve the quality and reliability of your generated descriptions.
+
+<img src='./assets/advanced_features.png' alt='Advanced Features' />
+
+### Additional Context
+When generating descriptions, you might want to provide additional information that is relevant for your products. For example, if you are a fashion retailer selling clothing, you might have additional guidelines for your customers on how to take care of their clothing depending on the materials used or how to mix and match with other products to create a trendy outfit. Description Genius allows you to upload any number of text files containing this additional information. Using vector search, we extract the relevant portions of text for each product and pass that as additional context to the LLM, enabling it to generate even more relevant and higher quality descriptions.
+
+### Forbidden Words
+You might have specific requirements about words that should never appear in your descriptions. For example, you might want to avoid overly promising claims such as "this product is *perfect* for all occasions". With Description Genius, you can input a list of words that should never appear in your descriptions. We then automatically find any instances of these words in the output, allowing you to immediately correct or regenerate the undesirable descriptions.
+
+### Automated Scoring
+If you are generating a large number of descriptions, it might be infeasible to manually check all of the generated text against your quality criteria. Description Genius allows you to provide a custom quality criteria and scores the generated description against the given criteria. Now you can quickly identify low scoring descriptions and correct or regenerate them.
+
 
 ## Disclaimer
 
