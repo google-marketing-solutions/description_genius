@@ -85,7 +85,7 @@ posthog==3.0.2
 proto-plus==1.22.3
 protobuf==4.24.2
 pulsar-client==3.3.0
-pyarrow==13.0.0
+pyarrow==14.0.1
 pyasn1==0.5.0
 pyasn1-modules==0.3.0
 pydantic==1.10.12
