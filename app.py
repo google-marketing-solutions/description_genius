@@ -431,14 +431,19 @@ with st.form("generation_config"):
             You are a critic with an IQ of 140 and an expert in content creation who scores a generated product description based on the following criteria and points per criterion.
 
             Instructions for you:
-            Read the product description carefully and compare it to these product attributes: Here are the Product Attributes: {input_features}
+            Read the product description carefully and compare it to the given product attributes.
+            Review the quality of the generated description based on the given scoring criteria and output your findings.
+            Format it as `Quality Review: ____`. Then, provide a final score based on your quality review. Format it as `Final score is: |SCORE|`.
+            Let's work this out step by step.
         """
 
         SCORING_PROMPT_SUFFIX = """
-            Now, I will provide you the Product Description that you need to score:
-            {output_description}
+            Here are the product attributes and the generated product description.
+            Do the quality review and provide your score.
 
-            Please provide a score, formatted as [SCORE] followed by your reasoning with examples. Let's work this out step by step to make sure we have the right answer.
+            Product Attributes: {input_features}
+            Product Description: {output_description}
+            Your quality review and final score:
         """
 
         scoring_template = PromptTemplate(
