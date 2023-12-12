@@ -80,6 +80,34 @@ def render_dataframe(dataframe: pd.DataFrame) -> None:
         st.dataframe(dataframe)
 
 
+def selectable_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
+    """(Re-)renders a dataframe and returns the selected rows.
+
+    This function provides a workaround for missing streamlit functionality to
+    get user selected rows from a DataFrame / Data editior. It (re-)renders a
+    given DataFrame on the UI with all the selected rows and returns those
+    selected rows as a new DataFrame.
+
+    Args:
+        dataframe (pd.DataFrame): Input DataFrame.
+
+    Returns:
+        pd.DataFrame: Selected rows from the Data editor.
+    """
+    selections_df = dataframe.copy()
+    selections_df.insert(0, "Select", False)
+
+    results_view = st.data_editor(
+        selections_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={"Select": st.column_config.CheckboxColumn(required=True)},
+    )
+
+    selected_rows = results_view[results_view.Select]
+    return selected_rows.drop("Select", axis=1)
+
+
 def fetch_response(
     google_cloud_project_id: str,
     description_prompt_template: Union[PromptTemplate, FewShotPromptTemplate],
@@ -489,6 +517,9 @@ with st.form("generation_config"):
         type="primary",
     )
 
+if "results" not in st.session_state:
+    st.session_state.results = None
+
 if generate_button:
     with st.spinner("Running request..."):
         results = fetch_response(
@@ -501,30 +532,54 @@ if generate_button:
             prompt_additional_context is not None,
         )
         if results:
-            results_columns = ["output_description"]
-            if enable_scoring:
-                results_columns.append("score")
-            results_df = pd.DataFrame.from_records(
-                data=results, columns=results_columns
-            )
-            if enable_word_filtering:
-                if filter_words_str:
-                    filter_words = filter_words_str.split(",")
-                    results_df["contains_forbidden_words"] = results_df[
-                        "output_description"
-                    ].str.contains("|".join(filter_words), na=False)
-
-            results_view = st.data_editor(
-                results_df,
-                use_container_width=True,
-                hide_index=True,
-            )
-            csv = convert_df(results_view)
-            st.download_button(
-                label="Download data as CSV",
-                data=csv,
-                file_name="text_descriptions.csv",
-                mime="text/csv",
-            )
+            st.session_state.results = results
         else:
             st.warning("No results were returned.", icon="⚠️")
+
+if st.session_state.results is not None:
+    results_columns = ["output_description"]
+    if enable_scoring:
+        results_columns.append("score")
+    results_df = pd.DataFrame.from_records(
+        data=st.session_state.results, columns=results_columns
+    )
+    if enable_word_filtering:
+        if filter_words_str:
+            filter_words = filter_words_str.split(",")
+            results_df["contains_forbidden_words"] = results_df[
+                "output_description"
+            ].str.contains("|".join(filter_words), na=False)
+
+    # Workaround to render the results DataFrame with selectable rows.
+    # TODO(): Update this when built-in selection functionality becomes
+    # available in Streamlit.
+    selected_results = selectable_dataframe(results_df)
+    selected_indices = selected_results.index
+    regenerate_features = [prompt_features[i] for i in selected_indices]
+
+    regenerate_button = st.button("Regenerate Selected")
+    if regenerate_button:
+        with st.spinner("Running request..."):
+            regenerated_results = fetch_response(
+                gcp_id,
+                description_template,
+                regenerate_features,
+                llm_model_name,
+                temperature,
+                scoring_template,
+                prompt_additional_context is not None,
+            )
+            if regenerated_results:
+                for index, result in zip(selected_indices, regenerated_results):
+                    st.session_state.results[index] = result
+                st.experimental_rerun()
+            else:
+                st.warning("No results were returned.", icon="⚠️")
+
+    csv = convert_df(results_df)
+    st.download_button(
+        label="Download data as CSV",
+        data=csv,
+        file_name="text_descriptions.csv",
+        mime="text/csv",
+    )
