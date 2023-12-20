@@ -141,7 +141,7 @@ torch==2.0.1
 torchvision==0.15.2
 tornado==6.3.3
 tqdm==4.66.1
-transformers==4.33.1
+transformers==4.36.0
 typing-inspect==0.9.0
 typing_extensions==4.7.1
 tzdata==2023.3
