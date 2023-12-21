@@ -1,11 +1,21 @@
 # Description Genius 🦉
-[Requirements](#requirements) • [Features](#features) • [Getting Started](#getting-started) • [Advanced Features](#advanced-features) •  [Disclaimer](#disclaimer)
+[Overview](#overview) • [Updates](#updates) • [Requirements](#requirements) • [Features](#features) • [Getting Started](#getting-started) • [Advanced Features](#advanced-features) •  [Disclaimer](#disclaimer)
 
+## Overview
 Easily generate captivating product descriptions using product features and any additional sources of information that you may have e.g. product reviews, usage instructions etc.
 
+## Updates
+* **December 2023**
+    * Support for [Gemini Pro](https://cloud.google.com/vertex-ai/docs/generative-ai/model-reference/gemini).
+    * Feature to regenerate selected descriptions.
+
+* **November 2023**. Minor security updates and version bumps.
+
+* **October 2023**. Initial release.
 
 ## Requirements
 Description Genius uses Google Cloud Platform's [Vertex AI language models](https://cloud.google.com/vertex-ai/docs/generative-ai/language-model-overview) to generate product descriptions. In order to use Description Genius, you need access to a Google Cloud Project with the [Vertex AI API](https://cloud.google.com/vertex-ai/docs/generative-ai/start/quickstarts/api-quickstart) enabled.
+
 
 
 ## Features

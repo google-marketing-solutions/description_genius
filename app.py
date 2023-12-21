@@ -32,7 +32,7 @@ from langchain.vectorstores import Chroma
 
 import utils
 
-_AVAILABLE_MODELS = ["text-bison-32k", "text-bison@001", "text-bison"]
+_AVAILABLE_MODELS = ["gemini-pro", "text-bison-32k", "text-bison"]
 
 _CHROMA_METADATA = {"hnsw:space": "cosine"}
 
