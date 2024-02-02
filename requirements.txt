@@ -24,7 +24,7 @@ fastapi==0.99.1
 favicon==0.7.0
 filelock==3.12.3
 flatbuffers==23.5.26
-fonttools==4.42.1
+fonttools==4.43.0
 frozenlist==1.4.0
 fsspec==2023.9.0
 gitdb==4.0.10
