@@ -124,7 +124,7 @@ soupsieve==2.4.1
 SQLAlchemy==2.0.20
 st-annotated-text==4.0.0
 starlette==0.27.0
-streamlit==1.26.0
+streamlit==1.30.0
 streamlit-camera-input-live==0.2.0
 streamlit-card==0.0.61
 streamlit-embedcode==0.1.2
