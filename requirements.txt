@@ -58,7 +58,7 @@ jsonpointer==2.4
 jsonschema==4.19.0
 jsonschema-specifications==2023.7.1
 kiwisolver==1.4.5
-langchain==0.0.352
+langchain==0.1.0
 langchain-community==0.0.5
 langchain-core==0.1.2
 langsmith==0.0.72
