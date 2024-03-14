@@ -60,7 +60,7 @@ jsonschema-specifications==2023.7.1
 kiwisolver==1.4.5
 langchain==0.0.352
 langchain-community==0.0.5
-langchain-core==0.1.2
+langchain-core==0.1.30
 langsmith==0.0.72
 lxml==4.9.3
 Markdown==3.4.4
