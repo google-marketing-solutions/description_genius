@@ -54,6 +54,9 @@ This should open up a browser window with the Description Genius UI. Simply uplo
 
 Once done, click on `Generate`. Description Genius will now generate your descriptions and output them in a table directly in the UI. You can now make any edits to the generated text and finally download it by clicking the `Download data as CSV` button.
 
+### Potential Problems
+You may see the error `fatal error: Python.h: No such file or directory` when installing the dependencies with pip. To remedy this, install the python3 development headers (e.g. with `apt install python3-dev`).
+
 ## Advanced Features
 Description Genius offers a number of advanced features to improve the quality and reliability of your generated descriptions.
 
