@@ -48,7 +48,7 @@ htbuilder==0.6.1
 httptools==0.6.0
 huggingface-hub==0.16.4
 humanfriendly==10.0
-idna==3.4
+idna==3.7
 importlib-metadata==6.8.0
 importlib-resources==6.0.1
 Jinja2==3.1.2
