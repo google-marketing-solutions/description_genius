@@ -14,7 +14,7 @@
 """The main app."""
 import hashlib
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, Sequence, Union
+from typing import Any, Hashable, Iterable, Mapping, Optional, Sequence, Union
 
 import chromadb
 import pandas as pd
@@ -22,13 +22,16 @@ import streamlit as st
 from langchain.chains import LLMChain, SequentialChain
 from langchain.docstore.document import Document
 from langchain.embeddings.sentence_transformer import SentenceTransformerEmbeddings
-from langchain.llms import VertexAI
+from langchain.prompts import PromptTemplate
 from langchain.prompts.example_selector.base import BaseExampleSelector
 from langchain.prompts.example_selector.ngram_overlap import NGramOverlapExampleSelector
 from langchain.prompts.few_shot import FewShotPromptTemplate
-from langchain.prompts.prompt import PromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
+from langchain_core.exceptions import OutputParserException
+from langchain_core.output_parsers.json import JsonOutputParser
+from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_google_vertexai import VertexAI
 
 import utils
 
@@ -74,13 +77,17 @@ def preprocess_dataframe(
     return df_preprocessed
 
 
-def render_dataframe(dataframe: pd.DataFrame) -> None:
+def render_dataframe(
+    dataframe: pd.DataFrame, column_config: Optional[dict] = None
+) -> None:
     """Renders the given DataFrame in a streamlit container."""
     with st.container():
-        st.dataframe(dataframe)
+        st.dataframe(dataframe, column_config=column_config, hide_index=True)
 
 
-def selectable_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
+def selectable_dataframe(
+    dataframe: pd.DataFrame, column_config: Optional[dict] = None
+) -> pd.DataFrame:
     """(Re-)renders a dataframe and returns the selected rows.
 
     This function provides a workaround for missing streamlit functionality to
@@ -101,7 +108,7 @@ def selectable_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
         selections_df,
         use_container_width=True,
         hide_index=True,
-        column_config={"Select": st.column_config.CheckboxColumn(required=True)},
+        column_config=column_config,
     )
 
     selected_rows = results_view[results_view.Select]
@@ -114,9 +121,6 @@ def fetch_response(
     features: list[dict[str, Any]],
     llm_model: str,
     llm_temperature: float,
-    scoring_prompt_template: Optional[
-        Union[PromptTemplate, FewShotPromptTemplate]
-    ] = None,
     has_additional_context: bool = False,
 ) -> list[dict[str, str]]:
     """Fetches generated text from Google Cloud Vertex AI.
@@ -127,12 +131,13 @@ def fetch_response(
     Args:
         google_cloud_project_id (str): Google cloud project to use for text
             generation.
-        description_prompt_template (FewShotPromptTemplate): Langchain Prompt
-            template for the description.
+        description_prompt_template (Union[PromptTemplate, FewShotPromptTemplate]): Langchain Prompt template for the description.
         features (list[dict[str, Any]]): Product Attributes
         llm_model (str): Vertex AI model to use for text generation.
         llm_temperature (float): LLM setting to control how imaginative the
             model can be.
+        has_additional_context (bool): If any additional context
+            should be included in prompt.
 
     Returns:
         list[dict[str, str]]: A list of generated texts.
@@ -150,34 +155,15 @@ def fetch_response(
     description_chain = LLMChain(
         prompt=description_prompt_template,
         llm=llm,
-        output_key="output_description",
+        output_key="generated_description",
         verbose=True,
     )
 
     sequence_chains: Sequence = [description_chain]
-    output_variables: Sequence = ["output_description"]
+    output_variables: Sequence = ["generated_description"]
     input_variables: Sequence = ["input_features"]
     if has_additional_context:
         input_variables.append("additional_context")
-
-    if scoring_prompt_template:
-        scoring_llm = VertexAI(
-            project=google_cloud_project_id,
-            location="us-central1",
-            model_name="text-bison@001",
-            temperature=0.2,
-            max_output_tokens=1024,
-            top_p=0.8,
-            top_k=40,
-        )
-        scoring_chain = LLMChain(
-            prompt=scoring_prompt_template,
-            llm=scoring_llm,
-            output_key="score",
-            verbose=True,
-        )
-        sequence_chains.append(scoring_chain)
-        output_variables.append("score")
 
     overall_chain = SequentialChain(
         chains=sequence_chains,
@@ -188,17 +174,87 @@ def fetch_response(
     return overall_chain.apply(features)
 
 
-@st.cache_data
-def score_description(description: str) -> float:
-    """Calculates a quality score for a given description.
+def score_descriptions(
+    google_cloud_project_id: str,
+    llm_model: str,
+    descriptions: Iterable[Mapping[str, str]],
+    criteria: Iterable[Mapping[Hashable, Any]],
+    total_points: float,
+    passing_points: float,
+) -> Sequence[Mapping[Hashable, str]]:
+    scoring_llm = VertexAI(
+        project=google_cloud_project_id,
+        location="us-central1",
+        model_name=llm_model,
+        temperature=0.3,
+        max_output_tokens=8192,
+        top_k=40,
+    )
 
-    Args:
-        description (str): _description_
+    class Score(BaseModel):
+        score: str = Field(
+            description="single character Y if ALL criterion are met or N if some criteria are not met (without quotes or punctuation)"
+        )
+        reasoning: str = Field(description="Step by step reasoning about the criterion")
 
-    Returns:
-        float: Quality score between -1 and 1.
-    """
-    raise NotImplementedError
+    parser = JsonOutputParser(pydantic_object=Score)
+
+    prompt = PromptTemplate(
+        template="""[BEGIN DATA]
+        You are a critic that scores a given a submission based on the given criteria. Now, I will provide the submission, followed by the scoring Criterion.
+  ***
+  [Submission]:
+        {description}
+  ***
+  [Criterion]:
+        {criterion}
+  [END DATA]
+  Does the submission meet the criterion? First, reason about the criterion to be sure that your conclusion is correct. Avoid simply stating the correct answers at the outset. Return a JSON object formatted as: {format_instructions}""",
+        input_variables=["features", "description", "criterion"],
+        partial_variables={"format_instructions": parser.get_format_instructions()},
+    )
+    runnable = prompt | scoring_llm | parser
+    description_evals = []
+    for description in descriptions:
+        current_score = total_points
+        score_details = []
+        for criterion in criteria:
+            # Stop evaluation if description failed already.
+            if current_score < passing_points:
+                break
+            criteria_points = criterion["Points"]
+            try:
+                eval_result = runnable.invoke(
+                    {
+                        "features": description["input_features"],
+                        "description": description["generated_description"],
+                        "criterion": criterion,
+                    }
+                )
+                if eval_result["score"] != "Y":
+                    current_score -= criteria_points
+                score_details.append(
+                    "Reasoning: "
+                    + eval_result["reasoning"]
+                    + "Passing: "
+                    + eval_result["score"]
+                )
+            except (OutputParserException, KeyError) as e:
+                score_details.append(
+                    "Reasoning: An error occurred while evaluating the description. Error: "
+                    + str(e)
+                    + "Passing: N"
+                )
+        description_evals.append(
+            {
+                "input_features": description["input_features"],
+                "generated_description": description["generated_description"],
+                "evaluation_details": "\n\n".join(score_details),
+                "passed": current_score >= passing_points,
+                "score": current_score,
+            }
+        )
+    return description_evals
 
 
 def get_context_documents(file_list: Iterable[Document]) -> list[CollectionDocument]:
@@ -308,9 +364,18 @@ with st.expander("**Data Upload**", expanded=True):
     prompt_features = []  # A list of dictionaries needed for Langchain prompting.
     if input_data:
         input_df = load_dataframe(input_data)
+        image_column = st.selectbox(
+            "Image Column",
+            input_df.columns.tolist(),
+            index=None,
+            placeholder="Select an image column if available.",
+        )
+        input_data_columns_config = {}
+        if image_column is not None:
+            input_data_columns_config[image_column] = st.column_config.ImageColumn()
         remove_html_tags = st.checkbox("Remove html tags", value=True)
         processed_df = preprocess_dataframe(input_df, remove_html_tags)
-        render_dataframe(processed_df)
+        render_dataframe(processed_df, input_data_columns_config)
         with st.container():
             input_columns = input_df.columns.to_list()
             columns_for_prompt = st.multiselect(
@@ -331,29 +396,25 @@ with st.form("generation_config"):
     st.write("**Prompt**")
     prompt_llm_role = st.text_input(
         "Provide a role to the LLM",
-        placeholder="You are an expert digital marketer. Your job is to write creative ads based on the provided data.",
+        value="You are an expert digital marketer. Your job is to write creative ads based on the provided data.",
     )
     prompt_llm_guidelines = st.text_area(
         "Provide any guidelines that the LLM should consider",
         height=150,
-        placeholder="###GUIDELINES###\n- Always be truthful and present factual information only.\n- Only use the provided features for generating the text.\n- Use an informal tone.\n- ...",
+        value="###GUIDELINES###\n- Always be truthful and present factual information only.\n- Only use the provided features for generating the text.\n- Structure your output in three sections, each with its headline. First section should give a general overview, second should discuss the materials and third should provide any usage or styling guidelines.\n- Use HTML formatting. Section headings should be <h2>. The text following should be in <p> blocks. Any keywords that could convince a user about purchasing our product should be highlighted with <strong>.",
     )
 
     examples_df = pd.DataFrame(
         [
             {
                 "input": "feature 1: value 1, feature 2: value 2, ..., feature n",
-                "output": "[HEADLINE] Lorem ipsum dolor sit amet\n[PARAGRAPH 1] Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-            },
-            {
-                "input": "feature 1: value 1, feature 2: value 2, ..., feature n",
-                "output": "[HEADLINE] Lorem ipsum dolor sit amet\n[PARAGRAPH 1] Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-            },
+                "output": "<h2> Lorem ipsum dolor sit amet</h2>\n<p> Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>",
+            }
         ]
     )
     prompt_action = st.text_input(
         "Generation prompt",
-        placeholder="Generate text descriptions based on the given ###FEATURES### and ###GUIDELINES###.",
+        value="Generate text descriptions based on the given ###FEATURES### and ###GUIDELINES###.",
     )
     st.write("**Few-Shot examples**")
     edited_df = st.data_editor(
@@ -409,8 +470,7 @@ with st.form("generation_config"):
                     pf.page_content
                     for pf in langchain_db.similarity_search(
                         pf,
-                        embedding_function=embedding_function,
-                        k=2,
+                        k=4,
                     )
                 ]
                 context_list.append(". ".join(context_docs_list))
@@ -433,25 +493,37 @@ with st.form("generation_config"):
 
         st.write("**Scoring**")
         scoring_template = None  # Variable so pylint: disable=C0103
-        scoring_prompt = st.text_area(
-            "Scoring criteria for the LLM",
-            height=200,
-            value="""
-                Here is the scoring Criteria:
-                Criteria 1: Repeating sentences depict poor quality and should be
-                scored low.
-                Criteria 2: The text should strictly be about the provided product.
-                Correct product type, number of items contained in the the product
-                as well as product features such as color should be followed. A list
-                of product attributes is provided to you for your scoring.
-                Criteria 3: Hyperbolic text, over promising or guarantees.
-
-                Assign a score of 1-5 to the product description, based on the above criteria:
-                4-5 points: The product description is accurate, well-structured, unique, uses appropriate language, and has an informal tone.
-                3-3.5 points: The product description meets most of the criteria, but may have some minor issues, such as a few repeating keywords or phrases, or a slightly too formal tone.
-                2-2.5 points: The product description meets some of the criteria, but has some significant issues, such as inaccurate information, poor structure, or excessive hyperbole.
-                1-1.5 points: The product description meets very few of the criteria and is of low quality.
-            """,
+        scoring_df = pd.DataFrame(columns=["Criterion", "Points"])
+        scoring_criteria = st.data_editor(
+            data=scoring_df,
+            column_config={
+                "Criterion": st.column_config.TextColumn(width="large"),
+                "Points": st.column_config.NumberColumn(
+                    "Points",
+                    help="Assign a numeric value to signify the importance of a particular criterion in the total scoring e.g. **Criterion Points > Min. passing score** ensure the entire description fails the quality check if this criterion is not passed.",
+                    width="small",
+                    required=True,
+                ),
+            },
+            num_rows="dynamic",
+            use_container_width=True,
+            hide_index=True,
+        )
+        scoring_prompt = ""
+        scoring_total_points_col, passing_score_col = st.columns(2)
+        scoring_total_points = scoring_total_points_col.number_input(
+            "Total available points",
+            0,
+            1000,
+            value=0,
+            help="Highest score a description can achieve. All descriptions start with this score and lose points if they fail a criterion.",
+        )
+        passing_score = passing_score_col.number_input(
+            "Minimum score required to pass",
+            -1000,
+            1000,
+            value=0,
+            help="Minimum score required for a description to pass a quality check.",
         )
         enable_scoring = st.toggle("Enable scoring")
 
@@ -470,12 +542,12 @@ with st.form("generation_config"):
             Do the quality review and provide your score.
 
             Product Attributes: {input_features}
-            Product Description: {output_description}
+            Product Description: {generated_description}
             Your quality review and final score:
         """
 
         scoring_template = PromptTemplate(
-            input_variables=["output_description", "input_features"],
+            input_variables=["generated_description", "input_features"],
             template=f"{SCORING_PROMPT_PREFIX}\n{scoring_prompt}\n{SCORING_PROMPT_SUFFIX}",
         )
 
@@ -486,7 +558,8 @@ with st.form("generation_config"):
     prompt_prefix = f"{prompt_llm_role}\n{prompt_llm_guidelines}\n{prompt_additional_context}\n{prompt_action}"
 
     # If examples have been provided, use a Few Shot Prompt.
-    if len(edited_df.index) > 0:
+    edited_df.dropna(how="all", inplace=True)
+    if not edited_df.empty:
         example_prompt = PromptTemplate(
             input_variables=["input", "output"],
             template="Input features: {input}\nOutput description: {output}",
@@ -528,32 +601,45 @@ if generate_button:
             prompt_features,
             llm_model_name,
             temperature,
-            scoring_template,
             prompt_additional_context is not None,
         )
         if results:
             st.session_state.results = results
+            if enable_scoring:
+                results_evals = score_descriptions(
+                    gcp_id,
+                    llm_model_name,
+                    st.session_state.results,
+                    scoring_criteria.to_dict("records"),
+                    scoring_total_points,
+                    passing_score,
+                )
+
+                if results_evals:
+                    st.session_state.results = results_evals
+                else:
+                    st.warning("An error occured when scoring descriptions.", icon="⚠️")
         else:
             st.warning("No results were returned.", icon="⚠️")
 
 if st.session_state.results is not None:
-    results_columns = ["output_description"]
-    if enable_scoring:
-        results_columns.append("score")
-    results_df = pd.DataFrame.from_records(
-        data=st.session_state.results, columns=results_columns
-    )
+    results_df = pd.DataFrame.from_records(data=st.session_state.results)
     if enable_word_filtering:
         if filter_words_str:
             filter_words = filter_words_str.split(",")
             results_df["contains_forbidden_words"] = results_df[
-                "output_description"
+                "generated_description"
             ].str.contains("|".join(filter_words), na=False)
+    output_df_column_config = {"Select": st.column_config.CheckboxColumn(required=True)}
+    if image_column is not None:
+        results_df.insert(loc=0, column=image_column, value=input_df[image_column])
+        # results_df[image_column] = input_df[image_column]
+        output_df_column_config[image_column] = st.column_config.ImageColumn()
 
     # Workaround to render the results DataFrame with selectable rows.
     # TODO(): Update this when built-in selection functionality becomes
     # available in Streamlit.
-    selected_results = selectable_dataframe(results_df)
+    selected_results = selectable_dataframe(results_df, output_df_column_config)
     selected_indices = selected_results.index
     regenerate_features = [prompt_features[i] for i in selected_indices]
 
@@ -566,13 +652,21 @@ if st.session_state.results is not None:
                 regenerate_features,
                 llm_model_name,
                 temperature,
-                scoring_template,
                 prompt_additional_context is not None,
             )
             if regenerated_results:
+                if enable_scoring:
+                    regenerated_results = score_descriptions(
+                        gcp_id,
+                        llm_model_name,
+                        regenerated_results,
+                        scoring_criteria.to_dict("records"),
+                        scoring_total_points,
+                        passing_score,
+                    )
                 for index, result in zip(selected_indices, regenerated_results):
                     st.session_state.results[index] = result
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.warning("No results were returned.", icon="⚠️")
 
