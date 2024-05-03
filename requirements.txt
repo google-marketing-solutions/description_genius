@@ -164,7 +164,7 @@ toolz==0.12.0
 torch==2.0.1
 torchvision==0.15.2
 tornado==6.3.3
-tqdm==4.66.1
+tqdm==4.66.3
 transformers==4.33.1
 typer==0.9.0
 types-protobuf==4.24.0.20240129
