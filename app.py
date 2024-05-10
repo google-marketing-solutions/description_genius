@@ -29,15 +29,29 @@ from langchain.prompts.few_shot import FewShotPromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_core.exceptions import OutputParserException
+from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers.json import JsonOutputParser
 from langchain_core.pydantic_v1 import BaseModel, Field
-from langchain_google_vertexai import VertexAI
+from langchain_google_vertexai import (
+    ChatVertexAI,
+    HarmBlockThreshold,
+    HarmCategory,
+    VertexAI,
+)
 
 import utils
 
-_AVAILABLE_MODELS = ["gemini-pro", "text-bison-32k", "text-bison"]
+_AVAILABLE_MODELS = ["gemini-1.0-pro-001", "gemini-pro", "text-bison-32k", "text-bison"]
 
 _CHROMA_METADATA = {"hnsw:space": "cosine"}
+
+_SAFETY_SETTINGS = {
+    HarmCategory.HARM_CATEGORY_UNSPECIFIED: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+}
 
 
 @dataclass
@@ -115,6 +129,105 @@ def selectable_dataframe(
     return selected_rows.drop("Select", axis=1)
 
 
+def transform_input_features_to_multimodal(
+    features: Sequence[dict[str, Any]],
+    description_prompt_template: Union[PromptTemplate, FewShotPromptTemplate],
+    has_additional_context: bool = False,
+):
+    """Transforms input features and prompt template to multimodal prompts."""
+    generation_prompts = []
+    for feature in features:
+        description_prompt = description_prompt_template.format(
+            input_features=feature["input_features"],
+            additional_context=(
+                feature["additional_context"] if has_additional_context else ""
+            ),
+        )
+        description_message = get_vertexai_message(
+            message_content=description_prompt, message_type="text"
+        )
+
+        product_image = get_vertexai_message(
+            message_content=feature["image_url"], message_type="image_url"
+        )
+
+        image_message = get_vertexai_message(
+            message_content="""You are provided an image of this product. Extract all of
+              the information from this image. Then use the provided text attributes and
+              the additional information you have extracted from the image to write a
+              product description.""",
+            message_type="text",
+        )
+
+        generation_prompts.append(
+            [HumanMessage(content=[description_message, image_message, product_image])]
+        )
+    return generation_prompts
+
+
+def get_vertexai_message(message_content: str, message_type: str) -> dict[str, Any]:
+    """Formats a message to be sent to a Vertex AI Multimodal endpoint."""
+    if message_type == "text":
+        return {"type": message_type, "text": message_content}
+    elif message_type == "image_url":
+        return {"type": message_type, "image_url": {"url": message_content}}
+    else:
+        raise ValueError(f"Invalid message type: {message_type}")
+
+
+def fetch_response_multimodal(
+    google_cloud_project_id: str,
+    description_prompt_template: Union[PromptTemplate, FewShotPromptTemplate],
+    features: list[dict[str, Any]],
+    llm_temperature: float,
+    has_additional_context: bool = False,
+    multimodal_model: str = "gemini-1.5-pro-preview-0409",
+):
+    """Fetches generated text from a Google Cloud Vertex AI multimodal model.
+
+    Args:
+        google_cloud_project_id (str): Google cloud project to use for text
+            generation.
+        description_prompt_template (Union[PromptTemplate, FewShotPromptTemplate]):
+            Langchain Prompt template for the description.
+        features (list[dict[str, Any]]): Product Attributes.
+        llm_temperature (float): LLM setting to control how imaginative the
+            model can be.
+        has_additional_context (bool, optional): If any additional context should be included in
+            prompt. Defaults to False.
+        multimodal_model (str, optional): The Google Cloud Vertex AI multimodal model to
+            use. Defaults to "gemini-1.5-pro-preview-0409".
+
+    Returns:
+        list[dict[str, str]]: A list of generated texts.
+    """
+    llm = ChatVertexAI(
+        project=google_cloud_project_id,
+        model_name=multimodal_model,
+        temperature=llm_temperature,
+        verbose=True,
+        safety_settings=_SAFETY_SETTINGS,
+    )
+
+    generation_prompts = transform_input_features_to_multimodal(
+        features=features,
+        description_prompt_template=description_prompt_template,
+        has_additional_context=has_additional_context,
+    )
+
+    output = llm.batch(inputs=generation_prompts)
+    output_result = []
+    for llm_response, product_feature in zip(output, features):
+        output_result.append(
+            {
+                "input_features": product_feature["input_features"],
+                "generated_description": llm_response.content,
+            }
+        )
+
+    return output_result
+
+
 def fetch_response(
     google_cloud_project_id: str,
     description_prompt_template: Union[PromptTemplate, FewShotPromptTemplate],
@@ -122,6 +235,7 @@ def fetch_response(
     llm_model: str,
     llm_temperature: float,
     has_additional_context: bool = False,
+    has_image: bool = False,
 ) -> list[dict[str, str]]:
     """Fetches generated text from Google Cloud Vertex AI.
 
@@ -131,17 +245,29 @@ def fetch_response(
     Args:
         google_cloud_project_id (str): Google cloud project to use for text
             generation.
-        description_prompt_template (Union[PromptTemplate, FewShotPromptTemplate]): Langchain Prompt template for the description.
+        description_prompt_template (Union[PromptTemplate, FewShotPromptTemplate]):
+            Langchain Prompt template for the description.
         features (list[dict[str, Any]]): Product Attributes
         llm_model (str): Vertex AI model to use for text generation.
         llm_temperature (float): LLM setting to control how imaginative the
             model can be.
-        has_additional_context (bool): If any additional context
-            should be included in prompt.
+        has_additional_context (bool): If any additional context should be included in
+            prompt. Defaults to False.
+        has_image (bool): If the product has an image that must be used for description.
+            Defaults to False.
+
 
     Returns:
         list[dict[str, str]]: A list of generated texts.
     """
+    if has_image:
+        return fetch_response_multimodal(
+            google_cloud_project_id,
+            description_prompt_template,
+            features,
+            llm_temperature,
+            has_additional_context,
+        )
     llm = VertexAI(
         project=google_cloud_project_id,
         location="us-central1",
@@ -370,6 +496,12 @@ with st.expander("**Data Upload**", expanded=True):
             index=None,
             placeholder="Select an image column if available.",
         )
+        use_image_for_generation = st.checkbox(
+            "Use image attributes for description",
+            value=False,
+            disabled=image_column is None,
+            help="Extract additional product attributes from the given image. **Requires a multimodal model e.g. Gemini Pro Vision. May incur additional costs**.",
+        )
         input_data_columns_config = {}
         if image_column is not None:
             input_data_columns_config[image_column] = st.column_config.ImageColumn()
@@ -390,7 +522,14 @@ with st.expander("**Data Upload**", expanded=True):
             utils.row_to_custom_str, args=(remove_empty_values,), axis=1
         )
         prompt_features_list = prompt_features_str.to_list()
-        prompt_features = [{"input_features": val} for val in prompt_features_list]
+        if image_column is not None and use_image_for_generation:
+            image_links_list = processed_df[image_column].to_list()
+            prompt_features = [
+                {"input_features": val, "image_url": url}
+                for val, url in zip(prompt_features_list, image_links_list)
+            ]
+        else:
+            prompt_features = [{"input_features": val} for val in prompt_features_list]
 
 with st.form("generation_config"):
     st.write("**Prompt**")
@@ -433,7 +572,6 @@ with st.form("generation_config"):
 
     _PROMPT_SUFFIX = """
     Input features: {input_features}
-    Output description:
     """
 
     with st.expander("Advanced"):
@@ -474,10 +612,9 @@ with st.form("generation_config"):
                     )
                 ]
                 context_list.append(". ".join(context_docs_list))
-            prompt_features = [
-                {"input_features": f, "additional_context": c}
-                for f, c in zip(prompt_features_list, context_list)
-            ]
+            # Add additional context to the prompt_features dictionary.
+            for feature, context in zip(prompt_features, context_list):
+                feature["additional_context"] = context
             prompt_additional_context = "\nNow I will provide some Additional Context for generating the descriptions: {additional_context}\n\n"
 
         forbidden_words_col.write("**Forbidden Words**")
@@ -602,6 +739,7 @@ if generate_button:
             llm_model_name,
             temperature,
             prompt_additional_context is not None,
+            use_image_for_generation and image_column is not None,
         )
         if results:
             st.session_state.results = results
@@ -614,7 +752,6 @@ if generate_button:
                     scoring_total_points,
                     passing_score,
                 )
-
                 if results_evals:
                     st.session_state.results = results_evals
                 else:
@@ -653,6 +790,7 @@ if st.session_state.results is not None:
                 llm_model_name,
                 temperature,
                 prompt_additional_context is not None,
+                use_image_for_generation and image_column is not None,
             )
             if regenerated_results:
                 if enable_scoring:

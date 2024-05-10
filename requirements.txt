@@ -22,6 +22,7 @@ contourpy==1.1.0
 cycler==0.11.0
 dataclasses-json==0.5.14
 Deprecated==1.2.14
+docstring_parser==0.16
 Faker==19.3.1
 fastapi==0.99.1
 favicon==0.7.0
@@ -34,7 +35,7 @@ gitdb==4.0.10
 GitPython==3.1.32
 google-api-core==2.11.1
 google-auth==2.27.0
-google-cloud-aiplatform==1.41.0
+google-cloud-aiplatform==1.50.0
 google-cloud-bigquery==3.11.4
 google-cloud-core==2.3.3
 google-cloud-resource-manager==1.10.3

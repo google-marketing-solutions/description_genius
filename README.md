@@ -5,6 +5,13 @@
 Easily generate captivating product descriptions using product features and any additional sources of information that you may have e.g. product reviews, usage instructions etc.
 
 ## Updates
+* **May 2024**
+    * Support for image inputs using [Gemini Pro Vision](https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/overview#multimodal_models)
+
+* **April 2024**
+    * Product image preview alongside text for easier review.
+    * Scoring improvements.
+
 * **December 2023**
     * Support for [Gemini Pro](https://cloud.google.com/vertex-ai/docs/generative-ai/model-reference/gemini).
     * Feature to regenerate selected descriptions.
