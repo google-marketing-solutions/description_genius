@@ -20,17 +20,15 @@ import chromadb
 import pandas as pd
 import streamlit as st
 from langchain.chains import LLMChain, SequentialChain
-from langchain.docstore.document import Document
-from langchain.embeddings.sentence_transformer import SentenceTransformerEmbeddings
-from langchain.prompts import PromptTemplate
-from langchain.prompts.example_selector.base import BaseExampleSelector
-from langchain.prompts.example_selector.ngram_overlap import NGramOverlapExampleSelector
-from langchain.prompts.few_shot import FewShotPromptTemplate
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.embeddings import SentenceTransformerEmbeddings
+from langchain_community.example_selectors import NGramOverlapExampleSelector
 from langchain_community.vectorstores import Chroma
+from langchain_core.documents import Document
+from langchain_core.example_selectors import BaseExampleSelector
 from langchain_core.exceptions import OutputParserException
 from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers.json import JsonOutputParser
+from langchain_core.prompts import FewShotPromptTemplate, PromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_google_vertexai import (
     ChatVertexAI,
@@ -38,10 +36,16 @@ from langchain_google_vertexai import (
     HarmCategory,
     VertexAI,
 )
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 import utils
 
-_AVAILABLE_MODELS = ["gemini-1.0-pro-001", "gemini-pro", "text-bison-32k", "text-bison"]
+_AVAILABLE_MODELS = [
+    "gemini-1.5-pro-001",
+    "gemini-1.5-flash-001",
+    "text-bison-32k",
+    "text-bison",
+]
 
 _CHROMA_METADATA = {"hnsw:space": "cosine"}
 
@@ -181,7 +185,7 @@ def fetch_response_multimodal(
     features: list[dict[str, Any]],
     llm_temperature: float,
     has_additional_context: bool = False,
-    multimodal_model: str = "gemini-1.5-pro-preview-0409",
+    multimodal_model: str = "gemini-1.5-pro-001",
 ):
     """Fetches generated text from a Google Cloud Vertex AI multimodal model.
 
@@ -196,7 +200,7 @@ def fetch_response_multimodal(
         has_additional_context (bool, optional): If any additional context should be included in
             prompt. Defaults to False.
         multimodal_model (str, optional): The Google Cloud Vertex AI multimodal model to
-            use. Defaults to "gemini-1.5-pro-preview-0409".
+            use. Defaults to "gemini-1.5-pro-001".
 
     Returns:
         list[dict[str, str]]: A list of generated texts.
@@ -273,7 +277,7 @@ def fetch_response(
         location="us-central1",
         model_name=llm_model,
         temperature=llm_temperature,
-        max_output_tokens=1024,
+        max_output_tokens=8192,
         top_p=0.8,
         top_k=40,
     )
