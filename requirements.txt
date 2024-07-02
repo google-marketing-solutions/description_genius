@@ -176,7 +176,7 @@ tomlkit==0.12.5
 toolz==0.12.0
 torch==2.0.1
 torchvision==0.15.2
-tornado==6.3.3
+tornado==6.4.1
 tqdm==4.66.1
 transformers==4.42.3
 typer==0.9.0
