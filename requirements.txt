@@ -12,7 +12,7 @@ beautifulsoup4==4.12.2
 blinker==1.6.2
 build==1.0.3
 cachetools==5.3.1
-certifi==2023.7.22
+certifi==2024.7.4
 charset-normalizer==3.2.0
 chroma-hnswlib==0.7.3
 chromadb==0.4.22
