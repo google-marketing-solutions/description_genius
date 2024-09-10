@@ -73,7 +73,15 @@ class CollectionDocument:
 
 def load_dataframe(csv_data) -> pd.DataFrame:
     """Loads a Pandas DataFrame from a given file object."""
-    return pd.read_csv(csv_data)
+    encodings = ['utf-8', 'iso-8859-1', 'windows-1252', 'mac_roman', 'ascii']
+    for enc in encodings:
+        try:
+            return pd.read_csv(csv_data, encoding=enc)
+        except (UnicodeDecodeError, FileNotFoundError) as e:
+            print(f"Failed to decode with encoding '{enc}': {e}")
+            continue
+    
+    raise ValueError("Could not decode the CSV file with the provided encodings. Check CSV file encoding.")
 
 
 def preprocess_dataframe(
