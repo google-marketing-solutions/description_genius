@@ -69,7 +69,7 @@ kubernetes==29.0.0
 langchain==0.2.6
 langchain-cli==0.0.25
 langchain-community==0.2.6
-langchain-core==0.2.10
+langchain-core==0.2.43
 langchain-google-vertexai==1.0.5
 langchain-text-splitters==0.2.2
 langserve==0.2.2
