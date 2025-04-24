@@ -48,7 +48,7 @@ greenlet==2.0.2
 grpc-google-iam-v1==0.12.6
 grpcio==1.60.0
 grpcio-status==1.57.0
-h11==0.14.0
+h11==0.16.0
 htbuilder==0.6.1
 httpcore==1.0.5
 httptools==0.6.0
