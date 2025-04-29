@@ -178,7 +178,7 @@ torch==2.0.1
 torchvision==0.15.2
 tornado==6.3.3
 tqdm==4.66.1
-transformers==4.42.3
+transformers==4.50.0
 typer==0.9.0
 types-protobuf==4.24.0.20240129
 types-requests==2.31.0.20240125
