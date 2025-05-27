@@ -1,0 +1,4 @@
+[server]
+runOnSave = true
+#fileWatcherType = "watchdog"
+fileWatcherType = "none"

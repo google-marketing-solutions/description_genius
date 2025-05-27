@@ -8,6 +8,17 @@ Easily generate captivating product descriptions using product features and any 
 
 ## Updates
 
+- **June 2025**
+
+  - Translation mode. Translate your existing descriptions in a multitude of languages.
+  - Code refactor.
+  - Performance improvements.
+
+- **May 2025**
+
+  - Support for Gemini 2.5 Flash and Flash Lite models.
+  - Minor bug fixes and version bumps.
+
 - **July 2024**
 
   - Support for latest Gemini flash and pro models.
@@ -39,6 +50,14 @@ Description Genius uses Google Cloud Platform's [Vertex AI language models](http
 
 Description Genius brings the latest advances in Generative AI in an easy to use package.
 
+### 🆕 Translation mode
+
+Description Genius now comes with a new feature to translate your product descriptions into multiple languages. Simply switch to the translation mode to get started.
+
+### Generation mode
+
+Easily generate descriptions from product features and additional information.
+
 <img src='./assets/ui.png' alt='Description Genius User Interface' />
 
 The interactive UI lets you upload a CSV file containing a list of your products alongside their features. An example CSV file could look like this:
@@ -60,7 +79,7 @@ Simply provide a few examples of your input and output (in the format of your ch
 
 ## Getting Started
 
-Description Genius comes with an easy to use UI built on top of [Streamlit](https://streamlit.io/).
+Description Genius comes with a simple user interface (UI) built on top of [Streamlit](https://streamlit.io/).
 
 To get started:
 
