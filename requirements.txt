@@ -82,7 +82,7 @@ langchain-community==0.3.24
 langchain-core==0.3.61
 langchain-google-vertexai==2.0.24
 langchain-huggingface==0.2.0
-langchain-text-splitters==0.3.8
+langchain-text-splitters==0.3.9
 langserve==0.3.1
 langsmith==0.3.42
 libcst==1.7.0
