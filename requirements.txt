@@ -32,7 +32,7 @@ entrypoints==0.4
 Faker==37.3.0
 fastapi==0.115.9
 favicon==0.7.0
-filelock==3.18.0
+filelock==3.20.1
 flatbuffers==25.2.10
 fonttools==4.58.0
 frozenlist==1.6.0
