@@ -79,7 +79,7 @@ langchain==0.3.25
 langchain-chroma==0.2.4
 langchain-cli==0.0.36
 langchain-community==0.3.24
-langchain-core==0.3.61
+langchain-core==0.3.81
 langchain-google-vertexai==2.0.24
 langchain-huggingface==0.2.0
 langchain-text-splitters==0.3.8
