@@ -102,7 +102,7 @@ multidict==6.4.4
 mypy_extensions==1.1.0
 narwhals==1.41.0
 networkx==3.4.2
-nltk==3.9.1
+nltk==3.9.3
 numexpr==2.10.2
 numpy==2.2.6
 oauthlib==3.2.2
