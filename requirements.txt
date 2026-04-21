@@ -146,7 +146,7 @@ PyPika==0.48.9
 pyproject-toml==0.1.0
 pyproject_hooks==1.2.0
 python-dateutil==2.9.0.post0
-python-dotenv==1.1.0
+python-dotenv==1.2.2
 pytz==2025.2
 pytz-deprecation-shim==0.1.0.post0
 PyYAML==6.0.2
