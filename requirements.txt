@@ -86,7 +86,7 @@ langchain-text-splitters==0.3.8
 langserve==0.3.1
 langsmith==0.3.42
 libcst==1.7.0
-lxml==5.4.0
+lxml==6.1.0
 Markdown==3.8
 markdown-it-py==3.0.0
 markdownlit==0.0.7
