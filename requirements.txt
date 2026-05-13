@@ -84,7 +84,7 @@ langchain-google-vertexai==2.0.24
 langchain-huggingface==0.2.0
 langchain-text-splitters==0.3.8
 langserve==0.3.1
-langsmith==0.3.42
+langsmith==0.8.0
 libcst==1.7.0
 lxml==5.4.0
 Markdown==3.8
