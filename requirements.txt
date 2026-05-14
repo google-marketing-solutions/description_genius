@@ -75,7 +75,7 @@ jsonschema==4.24.0
 jsonschema-specifications==2025.4.1
 kiwisolver==1.4.8
 kubernetes==32.0.1
-langchain==0.3.25
+langchain==0.3.30
 langchain-chroma==0.2.4
 langchain-cli==0.0.36
 langchain-community==0.3.24
